@@ -22,11 +22,14 @@ Verifique o estado dos containers:
 ```bash
 docker compose ps
 ```
-Você deverá ver quatro serviços saudáveis:
+Você deverá ver os serviços em execução:
 * `ticketing-postgres` (PostgreSQL 16)
 * `ticketing-redis` (Redis 7 com Keyspace Notifications ativadas)
 * `ticketing-zookeeper` (Zookeeper 7.5)
 * `ticketing-kafka` (Kafka 7.5)
+* `ticketing-prometheus` (Prometheus 2.48 na porta 9090)
+* `ticketing-grafana` (Grafana 10.2 na porta 3000, credenciais `admin`/`admin`)
+* `ticketing-jaeger` (Jaeger 1.51 na porta 16686 e OTLP 4317)
 
 ---
 
@@ -79,7 +82,19 @@ Abra o navegador em `http://localhost:4200`.
 
 ---
 
-## 5. Simulação Prática dos Cenários Críticos
+## 5. Observabilidade e Rastreamento Distribuído (Prometheus, Grafana e Jaeger)
+
+A plataforma exporta métricas em `/q/metrics` e envia traces via gRPC OpenTelemetry para o Jaeger.
+
+* **Acessar Grafana:** abra `http://localhost:3000` (login `admin`/`admin`). O dashboard *Reactive Ticketing - High Concurrency Observability* é carregado automaticamente com métricas de:
+  * Proporção de Locks Conflitados (`409 Conflict`) vs Aprovados (`200 OK`)
+  * Lag de mensagens no Kafka (`ticket.paid`)
+  * Conexões ativas no Event Loop Vert.x
+* **Acessar Jaeger Tracing:** abra `http://localhost:16686` para inspecionar os Trace IDs, visualizando a latência individual das operações entre o Angular, Quarkus, Redis e Kafka.
+
+---
+
+## 6. Simulação Prática dos Cenários Críticos
 
 ### Cenário A: Reserva Concorrente (Anti-Double Booking)
 1. Abra duas abas do navegador em `http://localhost:4200`.

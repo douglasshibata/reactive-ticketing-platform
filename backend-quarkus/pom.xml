@@ -75,6 +75,18 @@
             <artifactId>quarkus-smallrye-fault-tolerance</artifactId>
         </dependency>
 
+        <!-- Micrometer Prometheus Metrics -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- OpenTelemetry Distributed Tracing -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-opentelemetry</artifactId>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>io.quarkus</groupId>

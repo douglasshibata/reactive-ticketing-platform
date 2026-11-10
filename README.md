@@ -106,6 +106,16 @@ Serviços provisionados:
 * **Redis:** porta `6379`
 * **Apache Kafka:** porta `9092`
 * **Zookeeper:** porta `2181`
+* **Prometheus:** porta `9090` (Scraping de `/q/metrics` a cada 10s)
+* **Grafana:** porta `3000` (Painéis pré-provisionados para Distributed Lock e Kafka Lag)
+* **Jaeger Tracing:** porta `16686` (UI) e `4317` (Coletor OTLP gRPC)
+
+### 📊 Observabilidade em Tempo Real
+A stack de observabilidade monitora os três pilares críticos durante picos extremos de acesso:
+1. **Taxa de Conflito de Lock (Redis):** Monitora requisições `200 OK` vs `409 Conflict` em `/api/tickets/{id}/reserve`.
+2. **Lag do Consumidor Kafka:** Acompanha o tempo de resposta entre a compra de ingressos (`ticket.paid`) e o processamento de QR Codes em background.
+3. **Conexões WebSocket Ativas (Vert.x):** Quantifica o volume instantâneo de usuários conectados no mapa de assentos ao vivo.
+4. **Rastreamento Distribuído (Jaeger OTel):** Rastreia o fluxo completo ponta a ponta (Angular -> Quarkus -> Redis -> Kafka -> Postgres).
 
 ### 2. Executar e Testar o Back-end (Quarkus)
 ```bash
