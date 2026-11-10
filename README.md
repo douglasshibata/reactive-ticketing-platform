@@ -47,7 +47,14 @@ O sistema é desenhado com estrita separação entre o **Estado Quente** (Redis)
 * **Apache Kafka (Desacoplamento Assíncrono):** Quando o pagamento é aprovado, o Quarkus não gera o QR Code e o PDF na mesma requisição HTTP. Ele despacha um evento no tópico `ticket.paid` e responde imediatamente com sucesso ao cliente, enquanto workers em background realizam a renderização e o envio do e-mail.
 * **PostgreSQL (Estado Frio & Source of Truth):** Base relacional otimizada para histórico, relatórios contábeis e auditoria com *Optimistic Locking* (`version`).
 
-### 2. Credenciamento Offline-First (Staff PWA)
+### 2. Automatização de Transmissão & Gravação VOD Segura (Jibri, Kafka & S3)
+* **Webhook Reativo do Jibri (`/api/webhooks/jibri/upload-success`):** Recebe de forma 100% não-bloqueante o aviso de conclusão de upload do vídeo gerado pelo gravador Jibri.
+* **Validação Segura de Bearer Token:** Autentica a chamada contra um segredo partilhado injetado via variável de ambiente (`WEBHOOK_JIBRI_SECRET`), prevenindo falsificação de chamadas para desbloquear conteúdos pagos.
+* **Transação Reativa e Desacoplamento via Kafka:** Atualiza o estado do evento para `VOD_READY` no PostgreSQL via Hibernate Reactive Panache e emite imediatamente o evento `VodReadyEvent` no canal Kafka `events.vod.ready`. O **n8n** consome essa mensagem para orquestrar e-mails personalizados em lote (SendGrid/SMTP) sem sobrecarregar a API transacional.
+* **S3 Pre-signed URLs (< 1ms em memória):** O front-end nunca conhece a URL física do bucket S3. O endpoint protegido por JWT (`GET /api/events/{id}/vod-access`) valida o bilhete no banco e gera uma URL assinada temporária (3h) usando o `S3Presigner` da AWS sem chamadas de rede externas.
+* **Blindagem no Leitor Angular (`VodPlayerComponent`):** O leitor de vídeo utiliza `controlsList="nodownload"` e bloqueio de botão direito `(contextmenu)="preventRightClick($event)"`, garantindo mitigação contra pirataria direta.
+
+### 3. Credenciamento Offline-First (Staff PWA)
 * Na entrada do evento físico (onde a rede 4G/Wi-Fi costuma colapsar), a aplicação Angular opera como PWA com armazenamento em **IndexedDB**.
 * A validação do ingresso acontece localmente em **< 50ms**, gravando os acessos em uma fila `sync_queue`.
 * Quando a rede retorna, um fluxo RxJS captura o evento `online` e executa um `batch-sync` contra o endpoint `POST /api/check-in/batch-sync` no Quarkus.
@@ -67,9 +74,9 @@ reactive-ticketing-platform/
 │   ├── src/main/java/com/ticket/
 │   │   ├── domain/              # Event, Ticket, TicketStatus, User, TicketOrderEvent, CheckInEvent
 │   │   ├── repository/          # Panache Reactive Repositories (EventRepository, TicketRepository)
-│   │   ├── service/             # LockService (Redis SETNX) e TicketService
-│   │   ├── messaging/           # TicketEventProducer e TicketPaidConsumer (Kafka)
-│   │   └── web/                 # REST APIs e TicketSocket (/ws/tickets)
+│   │   ├── service/             # LockService, TicketService, VodAccessService, VodAccessResponse
+│   │   ├── messaging/           # TicketEventProducer, TicketPaidConsumer, VodReadyEvent (Kafka)
+│   │   └── web/                 # REST APIs (Event, Ticket, CheckIn, JibriWebhook, VodResource) e TicketSocket (/ws/tickets)
 │   ├── src/main/resources/      # application.properties com perfis de teste e prod
 │   ├── src/test/java/com/ticket/# Testes unitários para LockService e TicketService
 │   └── pom.xml                  # Dependências Quarkus 3.19.1
