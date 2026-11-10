@@ -30,6 +30,12 @@ public class Event extends PanacheEntityBase {
     @Column(nullable = false)
     public Integer availableSeats;
 
+    public String roomId;       // O identificador único da sala Jitsi
+
+    public String status;       // SCHEDULED, LIVE, VOD_READY
+
+    public String vodS3Url;     // A rota final do vídeo gravado
+
     public Event() {}
 
     public Event(Long id, String title, String description, String venue, LocalDateTime eventDate, Integer totalCapacity, Integer availableSeats) {
@@ -40,5 +46,19 @@ public class Event extends PanacheEntityBase {
         this.eventDate = eventDate;
         this.totalCapacity = totalCapacity;
         this.availableSeats = availableSeats;
+        this.status = "LIVE";
+    }
+
+    public Event(Long id, String title, String description, String venue, LocalDateTime eventDate, Integer totalCapacity, Integer availableSeats, String roomId, String status, String vodS3Url) {
+        this.id = id;
+        this.title = title;
+        this.description = description;
+        this.venue = venue;
+        this.eventDate = eventDate;
+        this.totalCapacity = totalCapacity;
+        this.availableSeats = availableSeats;
+        this.roomId = roomId;
+        this.status = status;
+        this.vodS3Url = vodS3Url;
     }
 }
