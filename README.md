@@ -60,6 +60,14 @@ O sistema é desenhado com estrita separação entre o **Estado Quente** (Redis)
 * Quando a rede retorna, um fluxo RxJS captura o evento `online` e executa um `batch-sync` contra o endpoint `POST /api/check-in/batch-sync` no Quarkus.
 * Em caso de cópias impressas duplicadas (duplo check-in em portões distintos), o Quarkus utiliza o carimbo de data/hora (`scanned_at`) físico para determinar o acesso legítimo e notificar a equipe patrimonial via WebSocket de potencial fraude.
 
+### 3. Integração Jibri (Jitsi) Webhook, Kafka e Transmissão Segura VOD
+Para além do evento físico ao vivo, a plataforma suporta conferência e gravação sob demanda (VOD):
+* **Endpoint Webhook Reativo (`POST /api/webhooks/jibri/upload-success`):** Recebe o callback do script Bash do Jibri assim que a gravação é concluída e enviada para o storage S3. A validação de segurança utiliza um Bearer Token secreto partilhado (`webhook.jibri.secret`), retornando `401 Unauthorized` em caso de token incorreto.
+* **Transação Reativa e Emissão Kafka:** O Quarkus atualiza atomicamente o estado do evento de `LIVE` para `VOD_READY` e associa o `vodS3Url` via Hibernate Reactive Panache. Em seguida, emite uma mensagem reativa para o tópico Kafka `events.vod.ready` usando `MutinyEmitter<VodReadyEvent>`.
+* **Orquestração Assíncrona via n8n:** O n8n subscreve o tópico `events.vod.ready`, consulta o banco ou Odoo para listar compradores com bilhete VIP/VOD e dispara e-mails hiper-personalizados em lotes sem onerar o core transacional do Quarkus.
+* **Geração de S3 Pre-signed URLs em Sub-milissegundo (`GET /api/events/{eventId}/vod-access`):** O Quarkus valida se o utilizador autenticado possui bilhete válido e gera localmente uma URL pré-assinada temporária com o SDK da AWS (`S3Presigner` com TTL de 3 horas), sem chamadas de rede à AWS, garantindo resposta em < 1ms.
+* **Proteção no Frontend Angular (`VodPlayerComponent`):** A URL segura é sanitizada com `DomSanitizer.bypassSecurityTrustUrl`, e o elemento de vídeo é blindado com `controlsList="nodownload"` e interceção de `contextmenu` (`preventRightClick`), impedindo cliques acidentais ou menus de download fácil.
+
 ---
 
 ## 📂 Estrutura de Diretórios

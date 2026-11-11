@@ -82,6 +82,19 @@
             <artifactId>quarkus-smallrye-fault-tolerance</artifactId>
         </dependency>
 
+        <!-- Quarkiverse Amazon S3 Client -->
+        <dependency>
+            <groupId>io.quarkiverse.amazonservices</groupId>
+            <artifactId>quarkus-amazon-s3</artifactId>
+            <version>3.3.1</version>
+        </dependency>
+
+        <!-- SmallRye JWT for Bearer token validation -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-smallrye-jwt</artifactId>
+        </dependency>
+
         <!-- Micrometer Prometheus Metrics -->
         <dependency>
             <groupId>io.quarkus</groupId>

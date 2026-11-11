@@ -34,12 +34,23 @@ public class Event extends PanacheEntityBase {
 
     public String status;       // SCHEDULED, LIVE, VOD_READY
 
-    public String vodS3Url;     // A rota final do vídeo gravado no S3
+    public String vodS3Url;     // A rota final do vídeo gravado
 
     public Event() {}
 
     public Event(Long id, String title, String description, String venue, LocalDateTime eventDate, Integer totalCapacity, Integer availableSeats) {
         this(id, title, description, venue, eventDate, totalCapacity, availableSeats, "room-" + id, "SCHEDULED", null);
+    }
+
+    public Event(Long id, String title, String description, String venue, LocalDateTime eventDate, Integer totalCapacity, Integer availableSeats, String roomId, String status, String vodS3Url) {
+        this.id = id;
+        this.title = title;
+        this.description = description;
+        this.venue = venue;
+        this.eventDate = eventDate;
+        this.totalCapacity = totalCapacity;
+        this.availableSeats = availableSeats;
+        this.status = "LIVE";
     }
 
     public Event(Long id, String title, String description, String venue, LocalDateTime eventDate, Integer totalCapacity, Integer availableSeats, String roomId, String status, String vodS3Url) {
