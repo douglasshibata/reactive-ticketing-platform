@@ -39,6 +39,10 @@ public class Event extends PanacheEntityBase {
     public Event() {}
 
     public Event(Long id, String title, String description, String venue, LocalDateTime eventDate, Integer totalCapacity, Integer availableSeats) {
+        this(id, title, description, venue, eventDate, totalCapacity, availableSeats, "room-" + id, "SCHEDULED", null);
+    }
+
+    public Event(Long id, String title, String description, String venue, LocalDateTime eventDate, Integer totalCapacity, Integer availableSeats, String roomId, String status, String vodS3Url) {
         this.id = id;
         this.title = title;
         this.description = description;

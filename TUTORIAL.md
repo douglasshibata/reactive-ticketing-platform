@@ -113,3 +113,38 @@ A plataforma exporta métricas em `/q/metrics` e envia traces via gRPC OpenTelem
 3. Valide o ingresso **VIP-101** digitando ou clicando no atalho. O acesso será liberado em **< 35ms** e armazenado localmente na fila.
 4. Tente escanear o mesmo ingresso novamente: o sistema rejeitará o acesso localmente informando que o ingresso já foi utilizado.
 5. Clique em **"Restabelecer Conexão"** e em seguida em **"Sincronizar Fila em Lote (Batch Sync)"**: o lote de acessos será reconciliado de uma só vez com o servidor Quarkus.
+
+---
+
+## 7. Webhook Jibri, Kafka Streaming e VOD Seguro no S3
+
+### A. Simulação do Webhook Jibri (Pós-Gravação)
+Quando a gravação de uma sala de conferência/evento Jitsi é concluída pelo Jibri e enviada ao bucket S3, o script emite a requisição:
+```bash
+curl -X POST http://localhost:8080/api/webhooks/jibri/upload-success \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer default_dev_secret_only" \
+  -d '{
+    "roomId": "room-1",
+    "s3Url": "recordings/event-1/master.mp4",
+    "status": "FINISHED"
+  }'
+```
+* **Resposta Esperada:** `HTTP 200 OK` com `{"message": "VOD atualizado e notificado"}`.
+* **Segurança:** Se o cabeçalho `Authorization` for omitido ou incorreto, o endpoint responde silenciosamente com `HTTP 401 Unauthorized`.
+* **Kafka:** O evento `VodReadyEvent` é emitido de forma não-bloqueante no tópico `events.vod.ready`.
+
+### B. Obtenção de URL Pré-assinada (S3 Pre-signed URL)
+O participante autenticado solicita acesso ao VOD:
+```bash
+curl -X GET http://localhost:8080/api/events/1/vod-access \
+  -H "Authorization: Bearer <SEU_JWT_TOKEN_DE_UTILIZADOR>"
+```
+* **Comportamento:** O Quarkus verifica se o usuário possui ingresso com status `SOLD` ou `CHECKED_IN` para o evento correspondente.
+* Em caso positivo, o `S3Presigner` assina criptograficamente a URL em memória com expiração de 3 horas.
+* Se o usuário não possuir ingresso válido, recebe `HTTP 403 Forbidden`.
+
+### C. Visualização no Leitor Seguro Angular
+Acesse a aba **"🎥 Transmissão VOD Segura (S3)"** na interface web (`http://localhost:4200`):
+* O componente solicita a URL segura via `VodService`.
+* O leitor de vídeo desativa o download nativo (`controlsList="nodownload"`) e anula o clique direito para evitar salvamento direto do arquivo de mídia.

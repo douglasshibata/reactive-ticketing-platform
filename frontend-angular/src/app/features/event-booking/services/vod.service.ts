@@ -1,4 +1,3 @@
-// src/app/features/event-booking/services/vod.service.ts
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';

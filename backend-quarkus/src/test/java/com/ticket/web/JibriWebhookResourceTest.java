@@ -3,99 +3,60 @@ package com.ticket.web;
 import com.ticket.messaging.VodReadyEvent;
 import com.ticket.web.dto.JibriWebhookPayload;
 import io.smallrye.mutiny.Uni;
-import io.smallrye.mutiny.subscription.Cancellable;
 import io.smallrye.reactive.messaging.MutinyEmitter;
-import org.eclipse.microprofile.reactive.messaging.Message;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
-import java.lang.reflect.Field;
-import java.util.concurrent.atomic.AtomicReference;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-public class JibriWebhookResourceTest {
+class JibriWebhookResourceTest {
 
     private JibriWebhookResource resource;
-    private AtomicReference<VodReadyEvent> emittedEvent;
+    private MutinyEmitter<VodReadyEvent> mockEmitter;
 
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
         resource = new JibriWebhookResource();
-        emittedEvent = new AtomicReference<>();
-
-        Field secretField = JibriWebhookResource.class.getDeclaredField("webhookSecret");
-        secretField.setAccessible(true);
-        secretField.set(resource, "test_secret_123");
-
-        // Mock emitter
-        MutinyEmitter<VodReadyEvent> mockEmitter = new MutinyEmitter<>() {
-            @Override
-            public Uni<Void> send(VodReadyEvent msg) {
-                emittedEvent.set(msg);
-                return Uni.createFrom().voidItem();
-            }
-
-            @Override
-            public void sendAndAwait(VodReadyEvent msg) {
-                emittedEvent.set(msg);
-            }
-
-            @Override
-            public Cancellable sendAndForget(VodReadyEvent msg) {
-                emittedEvent.set(msg);
-                return () -> {};
-            }
-
-            @Override
-            public <M extends Message<? extends VodReadyEvent>> void send(M msg) {}
-
-            @Override
-            public <M extends Message<? extends VodReadyEvent>> Uni<Void> sendMessage(M msg) {
-                return Uni.createFrom().voidItem();
-            }
-
-            @Override
-            public <M extends Message<? extends VodReadyEvent>> void sendMessageAndAwait(M msg) {}
-
-            @Override
-            public <M extends Message<? extends VodReadyEvent>> Cancellable sendMessageAndForget(M msg) {
-                return () -> {};
-            }
-
-            @Override
-            public void complete() {}
-
-            @Override
-            public void error(Exception e) {}
-
-            @Override
-            public boolean isCancelled() { return false; }
-
-            @Override
-            public boolean hasRequests() { return true; }
-        };
-
-        Field emitterField = JibriWebhookResource.class.getDeclaredField("vodEmitter");
-        emitterField.setAccessible(true);
-        emitterField.set(resource, mockEmitter);
+        resource.webhookSecret = "super_secret_token";
+        mockEmitter = mock(MutinyEmitter.class);
+        when(mockEmitter.send(any(VodReadyEvent.class))).thenReturn(Uni.createFrom().voidItem());
+        resource.vodEmitter = mockEmitter;
     }
 
     @Test
     void testUnauthorizedWhenHeaderMissingOrInvalid() {
-        JibriWebhookPayload payload = new JibriWebhookPayload("jitsi-room-101", "s3://recordings/video.mp4", "SUCCESS");
+        JibriWebhookPayload payload = new JibriWebhookPayload("room-101", "s3://recordings/video.mp4", "FINISHED");
 
-        Response respNull = resource.handleJibriUploadSuccess(null, payload).await().indefinitely();
-        assertEquals(Response.Status.UNAUTHORIZED.getStatusCode(), respNull.getStatus());
+        // Missing Authorization Header
+        Response response1 = resource.handleJibriUploadSuccess(null, payload).await().indefinitely();
+        assertEquals(Response.Status.UNAUTHORIZED.getStatusCode(), response1.getStatus());
 
-        Response respInvalid = resource.handleJibriUploadSuccess("Bearer wrong_secret", payload).await().indefinitely();
-        assertEquals(Response.Status.UNAUTHORIZED.getStatusCode(), respInvalid.getStatus());
+        // Incorrect Bearer Token
+        Response response2 = resource.handleJibriUploadSuccess("Bearer wrong_secret", payload).await().indefinitely();
+        assertEquals(Response.Status.UNAUTHORIZED.getStatusCode(), response2.getStatus());
     }
 
     @Test
-    void testBadRequestWhenPayloadEmpty() {
-        Response resp = resource.handleJibriUploadSuccess("Bearer test_secret_123", null).await().indefinitely();
-        assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    void testBadRequestWhenPayloadInvalid() {
+        String auth = "Bearer super_secret_token";
+        Response response = resource.handleJibriUploadSuccess(auth, null).await().indefinitely();
+        assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+
+        Response response2 = resource.handleJibriUploadSuccess(auth, new JibriWebhookPayload(null, "s3://...", "OK")).await().indefinitely();
+        assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response2.getStatus());
+    }
+
+    @Test
+    void testSecurityValidationRejectsUntrustedRequests() {
+        String authWrong = "Bearer invalid";
+        JibriWebhookPayload payload = new JibriWebhookPayload("room-101", "s3://recordings/video.mp4", "FINISHED");
+        Response response = resource.handleJibriUploadSuccess(authWrong, payload).await().indefinitely();
+        assertEquals(Response.Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
+        Mockito.verifyNoInteractions(mockEmitter);
     }
 }

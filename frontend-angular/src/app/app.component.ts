@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { EventBookingComponent } from './features/event-booking/event-booking.component';
 import { CheckoutComponent } from './features/checkout/checkout.component';
 import { CheckInComponent } from './features/check-in/check-in.component';
+import { VodPlayerComponent } from './features/event-booking/vod-player.component';
 import { LiveDashboardComponent } from './shared/live-dashboard.component';
 import { TicketStore } from './core/store/ticket-store.service';
 import { WebSocketService } from './core/services/websocket.service';
@@ -15,6 +16,7 @@ import { WebSocketService } from './core/services/websocket.service';
     EventBookingComponent,
     CheckoutComponent,
     CheckInComponent,
+    VodPlayerComponent,
     LiveDashboardComponent
   ],
   template: `
@@ -106,6 +108,19 @@ import { WebSocketService } from './core/services/websocket.service';
           >
             <span>📲</span> Credenciamento Portaria (Staff PWA)
           </button>
+
+          <button
+            (click)="activeTab = 'vod'"
+            class="py-2.5 px-5 text-xs font-semibold rounded-t-lg transition-all duration-150 flex items-center gap-2 border-b-2"
+            [class.border-brand-500]="activeTab === 'vod'"
+            [class.text-brand-400]="activeTab === 'vod'"
+            [class.bg-slate-900/60]="activeTab === 'vod'"
+            [class.border-transparent]="activeTab !== 'vod'"
+            [class.text-slate-400]="activeTab !== 'vod'"
+            [class.hover:text-slate-200]="activeTab !== 'vod'"
+          >
+            <span>🎥</span> Transmissão VOD Segura (S3)
+          </button>
         </div>
 
         <!-- Tab Contents -->
@@ -115,6 +130,8 @@ import { WebSocketService } from './core/services/websocket.service';
           <app-checkout></app-checkout>
         } @else if (activeTab === 'checkin') {
           <app-check-in></app-check-in>
+        } @else if (activeTab === 'vod') {
+          <app-vod-player></app-vod-player>
         }
       </main>
 
@@ -126,7 +143,7 @@ import { WebSocketService } from './core/services/websocket.service';
   `
 })
 export class AppComponent {
-  public activeTab: 'booking' | 'checkout' | 'checkin' = 'booking';
+  public activeTab: 'booking' | 'checkout' | 'checkin' | 'vod' = 'booking';
   public store = inject(TicketStore);
   public wsService = inject(WebSocketService);
 }

@@ -1,5 +1,4 @@
-// src/app/features/event-booking/vod-player.component.ts
-import { Component, OnInit, inject, signal, Input } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { VodService } from './services/vod.service';
@@ -36,10 +35,12 @@ import { VodService } from './services/vod.service';
     </div>
   `,
   styles: [`
-    .video-container { max-width: 800px; margin: 0 auto; background: #000; border-radius: 12px; }
+    .video-container { max-width: 800px; margin: 0 auto; background: #000; border-radius: 12px; padding: 20px; }
+    .video-container h2 { color: #fff; font-size: 1.25rem; font-weight: bold; margin-bottom: 1rem; }
     .secure-player { width: 100%; border-radius: 12px; outline: none; }
-    .error-box { padding: 40px; text-align: center; color: #ff5252; background: #1a1a1a; }
-    .loader { padding: 40px; text-align: center; color: #a0aec0; }
+    .error-box { padding: 40px; text-align: center; color: #ff5252; background: #1a1a1a; border-radius: 12px; }
+    .error-box button { margin-top: 15px; padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+    .loader { padding: 40px; text-align: center; color: #94a3b8; }
   `]
 })
 export class VodPlayerComponent implements OnInit {
@@ -50,7 +51,7 @@ export class VodPlayerComponent implements OnInit {
   public isLoading = signal<boolean>(true);
   public errorMsg = signal<string | null>(null);
 
-  @Input() public eventId = '101'; // Passado via @Input() ou Router Param em produção
+  public eventId = '1'; // Passado via @Input() ou Router Param em produção
 
   ngOnInit() {
     this.vodService.getSecureStreamUrl(this.eventId).subscribe({
@@ -60,7 +61,7 @@ export class VodPlayerComponent implements OnInit {
         this.videoUrl.set(safeUrl);
         this.isLoading.set(false);
       },
-      error: (err) => {
+      error: (_err) => {
         this.errorMsg.set('Não possui um bilhete válido para assistir a esta gravação.');
         this.isLoading.set(false);
       }
@@ -73,6 +74,6 @@ export class VodPlayerComponent implements OnInit {
   }
 
   buyTicket() {
-    // Redirecionamento ou emissão de evento para compra
+    // Redireciona ou notifica para compra de ingresso
   }
 }

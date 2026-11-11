@@ -9,7 +9,11 @@ import io.smallrye.reactive.messaging.MutinyEmitter;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.*;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.HeaderParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
@@ -32,9 +36,11 @@ public class JibriWebhookResource {
             @HeaderParam("Authorization") String authHeader,
             JibriWebhookPayload payload) {
 
-        // 1. Barreira de Segurança (Authentication Check)
+        // 1. Barreira de Segurança (Authentication Check com comparação em tempo constante)
         String expectedToken = "Bearer " + webhookSecret;
-        if (authHeader == null || !authHeader.equals(expectedToken)) {
+        if (authHeader == null || !java.security.MessageDigest.isEqual(
+                authHeader.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                expectedToken.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
             // Rejeita silenciosamente tentativas de intrusão
             return Uni.createFrom().item(Response.status(Response.Status.UNAUTHORIZED).build());
         }
@@ -43,7 +49,7 @@ public class JibriWebhookResource {
             return Uni.createFrom().item(Response.status(Response.Status.BAD_REQUEST).build());
         }
 
-        // 2. Abre a transação reativa no Postgres
+        // 2. Transação Reativa na Base de Dados
         return Panache.withTransaction(() ->
             Event.<Event>find("roomId", payload.roomId()).firstResult()
                 .onItem().ifNotNull().transform(event -> {
@@ -62,14 +68,10 @@ public class JibriWebhookResource {
             );
 
             // Envia para o Kafka e mapeia a resposta HTTP no final
-            if (vodEmitter != null) {
-                return vodEmitter.send(kafkaEvent)
-                    .replaceWith(Response.ok("{\"message\": \"VOD atualizado e notificado\"}").build());
-            } else {
-                return Uni.createFrom().item(Response.ok("{\"message\": \"VOD atualizado e notificado\"}").build());
-            }
+            return vodEmitter.send(kafkaEvent)
+                .replaceWith(Response.ok("{\"message\": \"VOD atualizado e notificado\"}").build());
         })
-        // 5. Se o evento não existia na base de dados (Room ID não encontrado)
+        // 5. Se o evento não existia na base de dados
         .onItem().ifNull().continueWith(() ->
             Response.status(Response.Status.NOT_FOUND).build()
         );

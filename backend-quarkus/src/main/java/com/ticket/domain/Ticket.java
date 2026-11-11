@@ -15,6 +15,12 @@ public class Ticket extends PanacheEntityBase {
     @Column(nullable = false)
     public Long eventId;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "event_fk")
+    public Event event;
+
+    public String userId;
+
     @Column(nullable = false)
     public String seatNumber;
 
@@ -45,6 +51,17 @@ public class Ticket extends PanacheEntityBase {
     public Ticket(String id, Long eventId, String seatNumber, String tier, BigDecimal price, TicketStatus status) {
         this.id = id;
         this.eventId = eventId;
+        this.seatNumber = seatNumber;
+        this.tier = tier;
+        this.price = price;
+        this.status = status;
+    }
+
+    public Ticket(String id, Long eventId, Event event, String userId, String seatNumber, String tier, BigDecimal price, TicketStatus status) {
+        this.id = id;
+        this.eventId = eventId;
+        this.event = event;
+        this.userId = userId;
         this.seatNumber = seatNumber;
         this.tier = tier;
         this.price = price;

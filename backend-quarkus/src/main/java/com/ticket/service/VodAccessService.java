@@ -18,65 +18,63 @@ import java.time.Duration;
 public class VodAccessService {
 
     @Inject
-    S3Presigner presigner; // O Quarkus injeta e gere o ciclo de vida automaticamente
+    public S3Presigner presigner; // O Quarkus injeta e gere o ciclo de vida automaticamente
 
     @ConfigProperty(name = "aws.s3.vod.bucket-name", defaultValue = "empresa-vod-archive-prd")
-    String bucketName;
+    public String bucketName;
 
     /**
      * Valida o bilhete e gera o link seguro.
      */
-    public Uni<VodAccessResponse> generateSecureUrl(String eventIdStr, String userId) {
-        Long eventId;
+    public Uni<VodAccessResponse> generateSecureUrl(String eventId, String userId) {
+        Long parsedEventId;
         try {
-            eventId = Long.parseLong(eventIdStr);
+            parsedEventId = Long.parseLong(eventId);
         } catch (NumberFormatException e) {
-            return Uni.createFrom().failure(new IllegalArgumentException("Formato inválido de ID do evento"));
+            return Uni.createFrom().failure(new SecurityException("ID de evento inválido."));
         }
 
-        // 1. Validação de Regra de Negócio (O utilizador comprou o bilhete para o evento?)
+        // 1. Validação de Regra de Negócio (O utilizador comprou o bilhete?)
         return Ticket.<Ticket>find(
-                "eventId = ?1 and (lockedByUserId = ?2 or ownerEmail = ?2) and (status = ?3 or status = ?4)",
-                eventId, userId, TicketStatus.SOLD, TicketStatus.CHECKED_IN
+                "(eventId = ?1 or (event is not null and event.id = ?1)) and (userId = ?2 or lockedByUserId = ?2) and (status = ?3 or status = ?4)",
+                parsedEventId,
+                userId,
+                TicketStatus.SOLD,
+                TicketStatus.CHECKED_IN
             )
             .firstResult()
-            .onItem().ifNotNull().transformToUni(ticket ->
-                Event.<Event>findById(eventId)
-                    .onItem().ifNotNull().transform(event -> {
-                        String videoKey = event.vodS3Url != null ? event.vodS3Url : "recordings/events/" + eventId + "/stream.mp4";
+            .onItem().ifNotNull().transformToUni(ticket -> {
+                // 2. Busca a URL ou chave do vídeo no Evento associado
+                if (ticket.event != null && ticket.event.vodS3Url != null) {
+                    return Uni.createFrom().item(ticket.event.vodS3Url);
+                }
+                // Se a entidade ticket não estiver ligada no banco relacional direto, busca o Evento
+                return Event.<Event>findById(parsedEventId)
+                    .map(ev -> (ev != null && ev.vodS3Url != null) ? ev.vodS3Url : "recordings/event-" + eventId + "/master.mp4");
+            })
+            .onItem().ifNotNull().transform(videoKey -> {
+                // 3. Constrói o pedido base do S3
+                GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                        .bucket(bucketName)
+                        .key(videoKey)
+                        .build();
 
-                        // 3. Constrói o pedido base do S3
-                        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                                .bucket(bucketName)
-                                .key(videoKey)
-                                .build();
+                // 4. Cria o pedido de assinatura com TTL restrito (Ex: 3 horas)
+                GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                        .signatureDuration(Duration.ofHours(3))
+                        .getObjectRequest(getObjectRequest)
+                        .build();
 
-                        // 4. Cria o pedido de assinatura com TTL restrito (Ex: 3 horas)
-                        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                                .signatureDuration(Duration.ofHours(3))
-                                .getObjectRequest(getObjectRequest)
-                                .build();
+                // 5. Gera a assinatura criptográfica local (Operação super-rápida, em memória)
+                PresignedGetObjectRequest presignedRequest = presigner.presignGetObject(presignRequest);
 
-                        // 5. Gera a assinatura criptográfica local (Operação super-rápida, em memória)
-                        PresignedGetObjectRequest presignedRequest = presigner.presignGetObject(presignRequest);
-
-                        // 6. Retorna o DTO esperado pelo Angular
-                        return new VodAccessResponse(
-                                presignedRequest.url().toString(),
-                                presignedRequest.expiration().toString()
-                        );
-                    })
-                    .onItem().ifNull().failWith(() -> new SecurityException("Sem acesso ao VOD: evento não encontrado."))
-            )
+                // 6. Retorna o DTO esperado pelo Angular
+                return new VodAccessResponse(
+                        presignedRequest.url().toString(),
+                        presignedRequest.expiration().toString()
+                );
+            })
             // Se não encontrou o bilhete válido, lança exceção (traduzida para 403 Forbidden no REST)
             .onItem().ifNull().failWith(() -> new SecurityException("Sem acesso ao VOD."));
-    }
-
-    public void setPresigner(S3Presigner presigner) {
-        this.presigner = presigner;
-    }
-
-    public void setBucketName(String bucketName) {
-        this.bucketName = bucketName;
     }
 }

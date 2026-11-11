@@ -1,25 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-test('VodAccessResponse & Security Checks', () => {
-  const vodPayload = {
-    secureUrl: 'https://empresa-vod-archive-prd.s3.sa-east-1.amazonaws.com/recordings/events/101/video.mp4?X-Amz-Signature=abc123signed',
-    expiresAt: '2026-11-11T03:00:00Z'
+// Test VOD access response and anti-piracy configurations
+test('VOD Access - Contract & Token Expiry', (t) => {
+  const vodResponse = {
+    secureUrl: 'https://empresa-vod-archive-prd.s3.sa-east-1.amazonaws.com/recordings/event-1/master.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=10800',
+    expiresAt: new Date(Date.now() + 3 * 3600 * 1000).toISOString()
   };
 
-  assert.ok(vodPayload.secureUrl.includes('X-Amz-Signature'), 'URL should have AWS cryptographic signature');
-  assert.ok(vodPayload.secureUrl.includes('empresa-vod-archive-prd'), 'URL points to dedicated S3 VOD bucket');
-  assert.ok(vodPayload.expiresAt, 'ExpiresAt timestamp must be present');
+  assert.ok(vodResponse.secureUrl.includes('empresa-vod-archive-prd'));
+  assert.ok(vodResponse.secureUrl.includes('X-Amz-Expires=10800'));
+  assert.ok(new Date(vodResponse.expiresAt).getTime() > Date.now());
 });
 
-test('Angular VOD Security Attributes Contract', () => {
-  // Validate that the secure player configuration prevents direct download and right-click
+test('VOD Player - DOM Security Controls & Attributes', (t) => {
+  // Simulates DOM attributes verified in component template
   const playerConfig = {
-    controls: true,
     controlsList: 'nodownload',
-    disableRightClick: true
+    oncontextmenu: false,
+    preload: 'metadata'
   };
 
-  assert.equal(playerConfig.controlsList, 'nodownload', 'controlsList must be nodownload to avoid browser download button');
-  assert.equal(playerConfig.disableRightClick, true, 'contextmenu must be intercepted to prevent Save video as');
+  assert.equal(playerConfig.controlsList, 'nodownload', 'controlsList must restrict browser native download');
+  assert.equal(playerConfig.oncontextmenu, false, 'Right click must be suppressed to block saving');
 });
